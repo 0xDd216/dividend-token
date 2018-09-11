@@ -1,0 +1,17 @@
+{
+  "name": "dividend-token",
+  "version": "0.1.0",
+  "description": "A dividend bearing ERC20 token",
+  "main": "truffle.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "truffle test"
+  },
+  "author": "0xDd216 <0xDd216@protonmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "openzeppelin-solidity": "^1.12.0"
+  }
+}
