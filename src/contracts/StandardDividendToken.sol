@@ -12,7 +12,7 @@ contract StandardDividendToken is DividendToken, StandardToken {
     uint256 amount;
   }
   
-  mapping (address => Owed) internal owed; // Outstanding balance by address
+  mapping (address => Owed) internal owed_; // Outstanding balance by address
   uint256[] internal totals_; // Cumulative totals of dividends issued
   uint256 internal baseTotal_;
   uint256 internal minimum_; // Minimum dividend amount allowed (default 0)
@@ -43,10 +43,10 @@ contract StandardDividendToken is DividendToken, StandardToken {
 
   function outstandingFor(address _recipient) public view returns (uint256) {    
     uint extra = totals_[totals_.length.sub(1)]
-      .sub(totals_[owed[_recipient].to])
+      .sub(totals_[owed_[_recipient].to])
       .mul(balanceOf(_recipient))
       .div(baseTotal_);
-    return owed[_recipient].amount.add(extra);
+    return owed_[_recipient].amount.add(extra);
   }
 
   function withdraw() public returns (uint256) {
@@ -69,21 +69,21 @@ contract StandardDividendToken is DividendToken, StandardToken {
 
   function _withdrawFor(address _address) internal returns (uint256) {
     _updateOwed(_address);
-    uint amount = owed[_address].amount;
-    owed[_address].amount = 0;
+    uint amount = owed_[_address].amount;
+    owed_[_address].amount = 0;
     _address.transfer(amount);
     return amount;
   }
 
   function _updateOwed(address _for) internal {
     uint owedTo = totals_.length.sub(1);
-    if (owed[_for].to != owedTo) {
+    if (owed_[_for].to != owedTo) {
       uint extra = totals_[owedTo]
-        .sub(totals_[owed[_for].to])
+        .sub(totals_[owed_[_for].to])
         .mul(balanceOf(_for))
         .div(baseTotal_);
-      owed[_for].amount = owed[_for].amount.add(extra);
-      owed[_for].to = owedTo;
+      owed_[_for].amount = owed_[_for].amount.add(extra);
+      owed_[_for].to = owedTo;
     }
   }
 }
