@@ -14,7 +14,7 @@ contract StandardDividendToken is DividendToken, StandardToken {
   
   mapping (address => Owed) internal owed_; // Outstanding balance by address
   uint256[] internal totals_; // Cumulative totals of dividends issued
-  uint256 internal baseTotal_;
+  uint256 internal baseTotal_; // Used to account for changes in supply
   uint256 internal minimum_; // Minimum dividend amount allowed (default 0)
 
   constructor() public {
@@ -55,14 +55,18 @@ contract StandardDividendToken is DividendToken, StandardToken {
   }
 
   function _addDividend(uint256 _amount) internal {
-    require(totalSupply_ > 0);
-    
+    require(totalSupply_ > 0); // avoid divide-by-zero
+
+    // if we are yet to set a base total then do so
     if(totals_.length == 1 && baseTotal_ == 0)
       baseTotal_ = totalSupply_;
     
     if(totalSupply_ == baseTotal_)
       totals_.push(totals_[totals_.length.sub(1)].add(_amount));
     else {
+      // to avoid re-calculation of percentage holdings when
+      // supply changes, we factor the changes into the
+      // cumulative total of paid dividends
       uint amount = _amount.mul(baseTotal_).div(totalSupply_);
       totals_.push(totals_[totals_.length.sub(1)].add(amount));
     }
@@ -79,6 +83,7 @@ contract StandardDividendToken is DividendToken, StandardToken {
 
   function _updateOwed(address _for) internal {
     uint owedTo = totals_.length.sub(1);
+    // if record of owed payments is not up-to-date
     if (owed_[_for].to != owedTo) {
       uint extra = totals_[owedTo]
         .sub(totals_[owed_[_for].to])
