@@ -12,6 +12,8 @@
   "author": "0xDd216 <0xDd216@protonmail.com>",
   "license": "MIT",
   "dependencies": {
+    "chai": "^4.1.2",
+    "chai-bignumber": "^2.0.2",
     "openzeppelin-solidity": "^1.12.0"
   }
 }
