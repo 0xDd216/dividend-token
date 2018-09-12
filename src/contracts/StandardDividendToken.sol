@@ -75,9 +75,10 @@ contract StandardDividendToken is DividendToken, StandardToken {
   function _withdrawFor(address _address) internal returns (uint256) {
     _updateOwed(_address);
     uint amount = owed_[_address].amount;
-    owed_[_address].amount = 0;
-    if(amount > 0)
+    if(amount > 0) {
+      owed_[_address].amount = 0;
       _address.transfer(amount);
+    }
     return amount;
   }
 
