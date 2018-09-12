@@ -41,7 +41,8 @@ contract StandardDividendToken is DividendToken, StandardToken {
     return super.transfer(_to, _value);
   }
 
-  function outstandingFor(address _recipient) public view returns (uint256) {    
+  function outstandingFor(address _recipient) public view returns (uint256) {
+    if(totals_.length == 1) return 0;
     uint extra = totals_[totals_.length.sub(1)]
       .sub(totals_[owed_[_recipient].to])
       .mul(balanceOf(_recipient))
@@ -64,7 +65,7 @@ contract StandardDividendToken is DividendToken, StandardToken {
     else {
       uint amount = _amount.mul(baseTotal_).div(totalSupply_);
       totals_.push(totals_[totals_.length.sub(1)].add(amount));
-    }    
+    }
   }  
 
   function _withdrawFor(address _address) internal returns (uint256) {
