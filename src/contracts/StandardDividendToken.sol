@@ -71,7 +71,8 @@ contract StandardDividendToken is DividendToken, StandardToken {
     _updateOwed(_address);
     uint amount = owed_[_address].amount;
     owed_[_address].amount = 0;
-    _address.transfer(amount);
+    if(amount > 0)
+      _address.transfer(amount);
     return amount;
   }
 
