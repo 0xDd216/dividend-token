@@ -8,294 +8,220 @@ require('chai')
 
 contract('StandardDividendToken', function(accounts) {
 
-  var creator = accounts[0];
-  var other = accounts[1];
-  var issuer = accounts[2];
+  const holder = accounts[0];
+  const other = accounts[1];
+  const issuer = accounts[2];
+  var that;
 
-  it("should owe 0 dividend on initialization", function() {
-    return TestDividendToken.new(100, 0)
-      .then(instance => instance.outstandingFor.call(creator, {from: creator}))
-      .then(outstanding => outstanding.should.be.bignumber.equal(0))
+  beforeEach(async function () {
+    this.token = await TestDividendToken.new(holder, 100, 42, {from: issuer});
+    this.holderBalance = web3.eth.getBalance(holder);
+    this.otherBalance = web3.eth.getBalance(other);
+    that = this;
   });
 
-  it("should pay 0 dividend after initialization", function() {
-    var preBalance;
-    var gasUsed;
-    return TestDividendToken.new(100, 0)
-      .then(function(instance) {
-        preBalance = web3.eth.getBalance(creator);
-        return instance.withdraw({from: creator})
-      })
-      .then(function(receipt) {
-        gasUsed = receipt.receipt.gasUsed;
-        return web3.eth.getTransaction(receipt.tx)
-      })
-      .then(function(tx) {
-        const after = web3.eth.getBalance(creator).add(tx.gasPrice.mul(gasUsed));
-        preBalance.should.be.bignumber.equal(after);
-      })
+  describe("restrictions", function() {
+    it("should revert on payment below minimum", function() {
+      return assertRevert(this.token.issueDividend({from: issuer, value: 41}));
+    });
+
+    it("should revert on payment to zero balance contract", function () {
+      return TestDividendToken.new(holder, 0, 0)
+        .then(t => assertRevert(t.issueDividend({from: issuer, value: 42})));
+    });
   });
 
-  it("should hold correct balance after issuing dividend", function() {
-    var token;
-    return TestDividendToken.new(100, 0)
-      .then(function(instance) {
-        token = instance;
-        return token.issueDividend({from: issuer, value: 42})
-      })
-      .then(() => web3.eth.getBalance(token.address).should.be.bignumber.equal(42))
+  describe("initialization", function() {
+    it("should owe 0 dividend on initialization", function() {
+      return this.token.outstandingFor.call(holder, {from: holder})
+        .then(n => n.should.be.bignumber.equal(0))
+    });
+
+    it("should pay 0 dividend after initialization", function() {
+      return this.token.withdraw({from: holder})
+        .then(function(receipt) {
+          this.gasUsed = receipt.receipt.gasUsed;
+          return web3.eth.getTransaction(receipt.tx)
+        })
+        .then(function(tx) {
+          const after = web3.eth.getBalance(holder).add(tx.gasPrice.mul(gasUsed));
+          that.holderBalance.should.be.bignumber.equal(after);
+        })
+    });
   });
 
-  it("should revert on payment below minimum", function() {
-    return TestDividendToken.new(100, 42)
-      .then(instance => assertRevert(instance.issueDividend({from: issuer, value: 41})))
-  });
+  describe("issuing dividends", function() {
+    it("should hold correct balance after issuing dividend", function() {   
+      return this.token.issueDividend({from: issuer, value: 42})
+        .then(() => web3.eth.getBalance(that.token.address)
+              .should.be.bignumber.equal(42))
+    });
 
-  it("should revert on payment to zero balance contract", function () {
-    return TestDividendToken.new(0, 0)
-      .then(instance => assertRevert(instance.issueDividend({from: issuer, value: 42})));
-  });
+    it("should owe full dividend after issuing", function () {
+      return this.token.issueDividend({from: issuer, value: 42})
+        .then(() => that.token.outstandingFor.call(holder, {from: holder}))
+        .then(n => n.should.be.bignumber.equal(42))
+    });
 
-  it("should owe full dividend after issuing", function () {
-    var token;
-    return TestDividendToken.new(100, 0)
-      .then(function(instance) {
-        token = instance;
-        return token.issueDividend({from: issuer, value: 1000})
-      })
-      .then(() => token.outstandingFor.call(creator, {from: creator}))
-      .then(outstanding => outstanding.should.be.bignumber.equal(1000))
-  });
+    it("should pay full dividend after issuing", function() {
+      return this.token.issueDividend({from: issuer, value: 42})
+        .then(() => that.token.withdraw({from: holder}))
+        .then(function(receipt) {
+          this.gasUsed = receipt.receipt.gasUsed;
+          return web3.eth.getTransaction(receipt.tx)
+        })
+        .then(function(tx) {
+          const after = web3.eth.getBalance(holder).add(tx.gasPrice.mul(gasUsed));
+          that.holderBalance.add(42).should.be.bignumber.equal(after);
+        })
+    });
 
-  it("should pay full dividend after issuing", function() {
-    var token;
-    var preBalance;
-    var gasUsed;
-    return TestDividendToken.new(100, 0)
-      .then(function(instance) {
-        preBalance = web3.eth.getBalance(creator);
-        token = instance;
-        return token.issueDividend({from: issuer, value: 1000});
-      })
-      .then(() => token.withdraw({from: creator}))
-      .then(function(receipt) {
-        gasUsed = receipt.receipt.gasUsed;
-        return web3.eth.getTransaction(receipt.tx)
-      })
-      .then(function(tx) {
-        const after = web3.eth.getBalance(creator).add(tx.gasPrice.mul(gasUsed));
-        preBalance.should.be.bignumber.equal(after.sub(1000));
-      })
-  });
+    it("should owe correct proportion of dividend", function() {
+      return this.token.transfer(other, 25, {from: holder})
+        .then(() => that.token.issueDividend({from: issuer, value: 42}))
+        .then(() => that.token.outstandingFor.call(holder, {from: holder}))
+        .then(n =>  n.should.be.bignumber.equal(31))
+        .then(() => that.token.outstandingFor.call(other, {from: holder}))
+        .then(n => n.should.be.bignumber.equal(10))
+    });
 
-  it("should owe correct proportion of dividend", function() {
-    var token;
-    return TestDividendToken.new(100, 0)
-      .then(function(instance) {
-        token = instance;
-        token.transfer(other, 25, {from: creator});
-      })
-      .then(() => token.issueDividend({from: issuer, value: 1000}))
-      .then(() => token.outstandingFor.call(creator, {from: creator}))
-      .then(outstanding =>  outstanding.should.be.bignumber.equal(750))
-      .then(() => token.outstandingFor.call(other, {from: creator}))
-      .then(outstanding => outstanding.should.be.bignumber.equal(250))
-  });
+    it("should pay correct proportion of dividend", function() {
+      return this.token.transfer(other, 25, {from: holder})
+        .then(() => that.token.issueDividend({from: issuer, value: 42}))
+        .then(() => that.token.withdraw({from: other}))
+        .then(function(receipt) {
+          this.gasUsed = receipt.receipt.gasUsed;
+          return web3.eth.getTransaction(receipt.tx)
+        })
+        .then(function(tx) {
+          const after = web3.eth.getBalance(other).add(tx.gasPrice.mul(gasUsed));
+          that.otherBalance.add(10).should.be.bignumber.equal(after);
+        })
+    });     
 
-  it("should pay correct proportion of dividend", function() {
-    var token;
-    var preBalance;
-    var gasUsed;
-    return TestDividendToken.new(100, 0)
-      .then(function(instance) {
-        preBalance = web3.eth.getBalance(other);
-        token = instance;
-        return token.transfer(other, 25, {from: creator});
-      })
-      .then(() => token.issueDividend({from: issuer, value: 1000}))
-      .then(() => token.withdraw({from: other}))
-      .then(function(receipt) {
-        gasUsed = receipt.receipt.gasUsed;
-        return web3.eth.getTransaction(receipt.tx)
-      })
-      .then(function(tx) {
-        const after = web3.eth.getBalance(other).add(tx.gasPrice.mul(gasUsed));
-        preBalance.should.be.bignumber.equal(after.sub(250));
-      })
-  });     
-
-  it("should owe 0 after withdrawing dividend", function() {
-    var token;
-    return TestDividendToken.new(100, 0)
-      .then(function (instance) {
-        token = instance;
-        token.issueDividend({from: issuer, value: 1000})
-      })
-      .then(() => token.withdraw({from: creator}))
-      .then(() => token.outstandingFor.call(creator, {from: creator}))
-      .then(outstanding => outstanding.should.be.bignumber.equal(0))
-  });
+    it("should owe 0 after withdrawing dividend", function() {
+      return this.token.issueDividend({from: issuer, value: 42})
+        .then(() => that.token.withdraw({from: holder}))
+        .then(() => that.token.outstandingFor.call(holder, {from: holder}))
+        .then(outstanding => outstanding.should.be.bignumber.equal(0))
+    });
     
-  it("should pay 0 after withdrawing dividend", function() {
-    var preBalance;
-    var gasUsed;
-    var token;
-    return TestDividendToken.new(100, 0)
-      .then(function(instance) {
-        token = instance;
-        return token.issueDividend({from: issuer, value: 1000})
-      })
-      .then(() => token.withdraw({from: creator})) // withdraw funds
-      .then(() => preBalance = web3.eth.getBalance(creator))
-      .then(() => token.withdraw({from: creator})) // try again
-      .then(function(receipt) {
-        gasUsed = receipt.receipt.gasUsed;
-        return web3.eth.getTransaction(receipt.tx)
-      })
-      .then(function(tx) {
-        const after = web3.eth.getBalance(creator).add(tx.gasPrice.mul(gasUsed));
-        preBalance.should.be.bignumber.equal(after);
-      }) 
+    it("should pay 0 after withdrawing dividend", function() {
+      return this.token.issueDividend({from: issuer, value: 42})
+        .then(() => that.token.withdraw({from: holder})) // withdraw funds
+        .then(function () {
+          this.holderBalance = web3.eth.getBalance(holder);
+          return that.token.withdraw({from: holder}); // try again
+        })
+        .then(function(receipt) {
+          this.gasUsed = receipt.receipt.gasUsed;
+          return web3.eth.getTransaction(receipt.tx)
+        })
+        .then(function(tx) {
+          const after = web3.eth.getBalance(holder).add(tx.gasPrice.mul(gasUsed));
+          this.holderBalance.should.be.bignumber.equal(after);
+        })
+    });
+
+    it("should owe correct dividend after post-issuance transfer", function() {
+      var token;
+      return this.token.issueDividend({from: issuer, value: 42})
+        .then(() => that.token.transfer(other, 50, {from: holder}))
+        .then(() => that.token.outstandingFor.call(holder, {from: holder}))
+        .then(outstanding => outstanding.should.be.bignumber.equal(42))
+    });
+
+    it("should pay correct dividend after post-issuance transfer", function() {
+      return this.token.issueDividend({from: issuer, value: 42})
+        .then(() => that.token.transfer(other, 25, {from: holder}))      
+        .then(function(receipt) {
+          gasUsed = receipt.receipt.gasUsed;
+          return that.token.withdraw({from: holder});
+        })
+        .then(function(receipt) {
+          gasUsed += receipt.receipt.gasUsed;
+          return web3.eth.getTransaction(receipt.tx);
+        })
+        .then(function(tx) { // assume gasPrice of txs is same
+          const after = web3.eth.getBalance(holder).add(tx.gasPrice.mul(gasUsed));
+          that.holderBalance.add(42).should.be.bignumber.equal(after);
+        })
+    });
+
+    it("should owe correct cumulative dividends in proportion", function() {
+      return this.token.issueDividend({from: issuer, value: 42})
+        .then(() => that.token.transfer(other, 50, {from: holder}))
+        .then(() => that.token.issueDividend({from: issuer, value: 42}))
+        .then(() => that.token.outstandingFor.call(holder, {from: holder}))
+        .then(outstanding => outstanding.should.be.bignumber.equal(63))
+    });
+
+    it("should pay correct cumulative dividends in proportion", function() {
+      return this.token.issueDividend({from: issuer, value: 42})
+        .then(() => that.token.transfer(other, 50, {from: holder}))
+        .then(function(receipt) {
+          this.gasUsed = receipt.receipt.gasUsed;
+          return that.token.issueDividend({from: issuer, value: 42})
+        })
+        .then(() => that.token.withdraw({from: holder}))      
+        .then(function(receipt) {
+          this.gasUsed += receipt.receipt.gasUsed;
+          return web3.eth.getTransaction(receipt.tx);
+        })
+        .then(function(tx) {
+          const after = web3.eth.getBalance(holder).add(tx.gasPrice.mul(gasUsed));
+          that.holderBalance.add(63).should.be.bignumber.equal(after);
+        })
+    });
   });
 
-  it("should owe correct dividend after change in supply", function() {
-    var token;
-    return TestDividendToken.new(100, 0)
-      .then(function (instance) {
-        token = instance;
-        return token.transfer(other, 50, {from: creator})
-      })
-      .then(() => token.mint(100, {from: other}))
-      .then(() => token.issueDividend({from: issuer, value: 1000}))
-      .then(() => token.outstandingFor.call(creator, {from: creator}))
-      .then(outstanding => outstanding.should.be.bignumber.equal(250))
-  });
+  describe("changing supply", function() {
+    it("should owe correct dividend after change in supply", function() {
+      return this.token.transfer(other, 50, {from: holder})
+        .then(() => that.token.mint(other, 100, {from: issuer}))
+        .then(() => that.token.issueDividend({from: issuer, value: 42}))
+        .then(() => that.token.outstandingFor.call(holder, {from: holder}))
+        .then(n => n.should.be.bignumber.equal(10))
+    });
 
-  it("should pay correct dividend after change in supply", function() {
-    var token;
-    var preBalance;
-    return TestDividendToken.new(100, 0)
-      .then(function (instance) {
-        token = instance;
-        return token.transfer(other, 50, {from: creator});
-      })
-      .then(() => preBalance = web3.eth.getBalance(creator))
-      .then(() => token.mint(100, {from: other}))
-      .then(() => token.issueDividend({from: issuer, value: 1000}))
-      .then(() => token.withdraw({from: creator}))
-      .then(function(receipt) {
-        gasUsed = receipt.receipt.gasUsed;
-        return web3.eth.getTransaction(receipt.tx);
-      })
-      .then(function(tx) {
-        const after = web3.eth.getBalance(creator).add(tx.gasPrice.mul(gasUsed));
-        preBalance.should.be.bignumber.equal(after.sub(250));
-      })
-  });
+    it("should pay correct dividend after change in supply", function() {
+      var token;
+      var preBalance;
+      return this.token.transfer(other, 50, {from: holder})
+        .then(() => that.token.mint(other, 100, {from: issuer}))
+        .then(() => that.token.issueDividend({from: issuer, value: 42}))
+        .then(() => that.token.withdraw({from: other}))
+        .then(function(receipt) {
+          this.gasUsed = receipt.receipt.gasUsed;
+          return web3.eth.getTransaction(receipt.tx);
+        })
+        .then(function(tx) {
+          const after = web3.eth.getBalance(other).add(tx.gasPrice.mul(gasUsed));
+          that.otherBalance.add(31).should.be.bignumber.equal(after);
+        })
+    });
 
-  it("should owe correct dividend after post-issuance transfer", function() {
-    var token;
-    return TestDividendToken.new(100, 0)
-      .then(function (instance) {
-        token = instance;
-        return token.issueDividend({from: issuer, value: 1000});
-      })
-      .then(() => token.transfer(other, 50, {from: creator}))
-      .then(() => token.outstandingFor.call(creator, {from: creator}))
-      .then(outstanding => outstanding.should.be.bignumber.equal(1000))
-  });
+    it("should owe correct cumulative dividends with change in supply", function() {
+      return this.token.issueDividend({from: issuer, value: 42})
+        .then(() => that.token.mint(other, 100, {from: issuer}))
+        .then(() => that.token.issueDividend({from: issuer, value: 42}))
+        .then(() => that.token.outstandingFor.call(holder, {from: holder}))
+        .then(outstanding => outstanding.should.be.bignumber.equal(63))
+    });
 
-  it("should pay correct dividend after post-issuance transfer", function() {
-    var token;
-    var preBalance;
-    var gasUsed;
-    return TestDividendToken.new(100, 0)
-      .then(function (instance) {
-        token = instance;
-        return  token.issueDividend({from: issuer, value: 1000});
-      })
-      .then(() => preBalance = web3.eth.getBalance(creator))
-      .then(() => token.transfer(other, 25, {from: creator}))      
-      .then(function(receipt) {
-        gasUsed = receipt.receipt.gasUsed;
-        return token.withdraw({from: creator});
-      })
-      .then(function(receipt) {
-        gasUsed += receipt.receipt.gasUsed;
-        return web3.eth.getTransaction(receipt.tx);
-      })
-      .then(function(tx) { // assume gasPrice of txs is same
-        const after = web3.eth.getBalance(creator).add(tx.gasPrice.mul(gasUsed));
-        preBalance.should.be.bignumber.equal(after.sub(1000));
-      })
-  });
-
-
-  it("should owe correct cumulative dividends in proportion", function() {
-    return TestDividendToken.new(100, 0)
-      .then(function (instance) {
-        token = instance;
-        return token.issueDividend({from: issuer, value: 42});
-      })
-      .then(() => token.issueDividend({from: issuer, value: 42}))
-      .then(() => token.outstandingFor.call(creator, {from: creator}))
-      .then(outstanding => outstanding.should.be.bignumber.equal(84))
-  });
-
-  it("should pay correct cumulative dividends in proportion", function() {
-    var token;
-    var preBalance;
-    var gasUsed;
-    return TestDividendToken.new(100, 0)
-      .then(function (instance) {
-        token = instance;
-        return  token.issueDividend({from: issuer, value: 42});
-      })
-      .then(() => token.issueDividend({from: issuer, value: 42}))
-      .then(() => preBalance = web3.eth.getBalance(creator))
-      .then(() => token.withdraw({from: creator}))      
-      .then(function(receipt) {
-        gasUsed = receipt.receipt.gasUsed;
-        return web3.eth.getTransaction(receipt.tx);
-      })
-      .then(function(tx) {
-        const after = web3.eth.getBalance(creator).add(tx.gasPrice.mul(gasUsed));
-        preBalance.should.be.bignumber.equal(after.sub(84));
-      })
-  });
-
-  it("should owe correct cumulative dividends with change in supply", function() {
-    return TestDividendToken.new(100, 0)
-      .then(function (instance) {
-        token = instance;
-        return token.issueDividend({from: issuer, value: 42});
-      })
-      .then(() => token.mint(100, {from: other}))
-      .then(() => token.issueDividend({from: issuer, value: 42}))
-      .then(() => token.outstandingFor.call(creator, {from: creator}))
-      .then(outstanding => outstanding.should.be.bignumber.equal(63))
-  });
-
-  it("should owe correct cumulative dividends with change in supply", function() {
-    var token;
-    var preBalance;
-    var gasUsed;
-    return TestDividendToken.new(100, 0)
-      .then(function (instance) {
-        token = instance;
-        return  token.issueDividend({from: issuer, value: 42});
-      })
-      .then(() => preBalance = web3.eth.getBalance(creator))
-      .then(() => token.mint(100, {from: other}))
-      .then(() => token.issueDividend({from: issuer, value: 42}))
-      .then(() => token.withdraw({from: creator}))
-      .then(function(receipt) {
-        gasUsed = receipt.receipt.gasUsed;
-        return web3.eth.getTransaction(receipt.tx);
-      })
-      .then(function(tx) {
-        const after = web3.eth.getBalance(creator).add(tx.gasPrice.mul(gasUsed));
-        preBalance.should.be.bignumber.equal(after.sub(63));
-      })
+    it("should pay correct cumulative dividends with change in supply", function() {
+      return this.token.issueDividend({from: issuer, value: 42})
+        .then(() => that.token.mint(other, 100, {from: issuer}))
+        .then(() => that.token.issueDividend({from: issuer, value: 42}))
+        .then(() => that.token.withdraw({from: holder}))
+        .then(function(receipt) {
+          this.gasUsed = receipt.receipt.gasUsed;
+          return web3.eth.getTransaction(receipt.tx);
+        })
+        .then(function(tx) {
+          const after = web3.eth.getBalance(holder).add(tx.gasPrice.mul(gasUsed));
+          that.holderBalance.add(63).should.be.bignumber.equal(after);
+        })
+    });
   });
 })
