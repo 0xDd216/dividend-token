@@ -87,6 +87,13 @@ contract StandardDividendToken is DividendToken, StandardToken {
     return _withdrawFor(msg.sender);
   }
 
+  /**
+   * @dev Adds an incoming dividend payment to cumulative
+   * totals to facilitate withdrawal calculation. totals_
+   * holds the cumulative totals of payments, adjusted for
+   * change in total supply against a base rate. If baseTotal_
+   * is not set then it is set to equal totalSupply_.
+   */
   function _addDividend(uint256 _amount) internal {
     require(totalSupply_ > 0); // avoid divide-by-zero
     
@@ -106,7 +113,7 @@ contract StandardDividendToken is DividendToken, StandardToken {
   }  
 
   /**
-   * Internal function which pays out to a given address. Expose to allow
+   * @dev Internal function which pays out to a given address. Expose to allow
    * 'push' payments. Won't trigger transfer if 0 owed.
    * @param _address to withdraw on behalf og
    * @return the amount withdrawn
@@ -122,7 +129,7 @@ contract StandardDividendToken is DividendToken, StandardToken {
   }
 
   /**
-   * Updates the record of the amount owed for a given address.
+   * @dev Updates the record of the amount owed for a given address.
    * Takes the total (adjusted) dividends paid since last update
    * and divides by the balance of the address. Must be called
    * before balance is adjusted.
