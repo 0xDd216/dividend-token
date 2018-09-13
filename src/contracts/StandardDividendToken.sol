@@ -68,7 +68,7 @@ contract StandardDividendToken is DividendToken, StandardToken {
   /**
    * @dev Gets the total amount withdrawable by the given address
    * @param _recipient address
-   * @returns wei owed
+   * @return wei owed
    */
   function outstandingFor(address _recipient) public view returns (uint256) {
     if(totals_.length == 1) return 0;
