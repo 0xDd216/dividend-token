@@ -4,6 +4,7 @@ import "./DividendToken.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
 
+
 /**
  * @title StandardDividendToken
  * @author 0xDd216
@@ -40,7 +41,7 @@ contract StandardDividendToken is DividendToken, StandardToken {
    * Should probably override this method to constrain who can call it.
    */
   function issueDividend() public payable returns (bool) {
-    require(msg.value >= minimum_);
+    require(msg.value >= minimum_, "Dividend amount is less than minimum");
     _addDividend(msg.value);
     emit DividendIssued(msg.sender, msg.value);
     return true;
@@ -71,7 +72,7 @@ contract StandardDividendToken is DividendToken, StandardToken {
    * @return wei owed
    */
   function outstandingFor(address _recipient) public view returns (uint256) {
-    if(totals_.length == 1) return 0;
+    if (totals_.length == 1) return 0;
     uint extra = totals_[totals_.length.sub(1)]
       .sub(totals_[owed_[_recipient].to])
       .mul(balanceOf(_recipient))
@@ -95,13 +96,14 @@ contract StandardDividendToken is DividendToken, StandardToken {
    * is not set then it is set to equal totalSupply_.
    */
   function _addDividend(uint256 _amount) internal {
-    require(totalSupply_ > 0); // avoid divide-by-zero
+    // avoid divide-by-zero
+    require(totalSupply_ > 0, "There must be tokens to distribute to");
     
     // if we are yet to set a base total then do so
-    if(totals_.length == 1 && baseTotal_ == 0)
+    if (totals_.length == 1 && baseTotal_ == 0)
       baseTotal_ = totalSupply_;
     
-    if(totalSupply_ == baseTotal_)
+    if (totalSupply_ == baseTotal_)
       totals_.push(totals_[totals_.length.sub(1)].add(_amount));
     else {
       // to avoid re-calculation of percentage holdings when
@@ -121,7 +123,7 @@ contract StandardDividendToken is DividendToken, StandardToken {
   function _withdrawFor(address _address) internal returns (uint256) {
     _updateOwed(_address);
     uint amount = owed_[_address].amount;
-    if(amount > 0) {
+    if (amount > 0) {
       owed_[_address].amount = 0;
       _address.transfer(amount);
     }
