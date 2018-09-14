@@ -1,4 +1,4 @@
-var TestDividendToken = artifacts.require("./TestDividendToken.sol");
+const TestDividendToken = artifacts.require("./TestDividendToken.sol");
 const BigNumber = web3.BigNumber;
 const { assertRevert } = require("openzeppelin-solidity/test/helpers/assertRevert.js");
 
@@ -124,7 +124,6 @@ contract('StandardDividendToken', function(accounts) {
     });
 
     it("should owe correct dividend after post-issuance transfer", function() {
-      var token;
       return this.token.issueDividend({from: issuer, value: 42})
         .then(() => that.token.transfer(other, 50, {from: holder}))
         .then(() => that.token.outstandingFor.call(holder, {from: holder}))
@@ -185,8 +184,6 @@ contract('StandardDividendToken', function(accounts) {
     });
 
     it("should pay correct dividend after change in supply", function() {
-      var token;
-      var preBalance;
       return this.token.transfer(other, 50, {from: holder})
         .then(() => that.token.mint(other, 100, {from: issuer}))
         .then(() => that.token.issueDividend({from: issuer, value: 42}))
