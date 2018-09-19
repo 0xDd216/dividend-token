@@ -117,7 +117,7 @@ contract StandardDividendToken is DividendToken, StandardToken {
   /**
    * @dev Internal function which pays out to a given address. Expose to allow
    * 'push' payments. Won't trigger transfer if 0 owed.
-   * @param _address to withdraw on behalf og
+   * @param _address to withdraw on behalf of
    * @return the amount withdrawn
    */
   function _withdrawFor(address _address) internal returns (uint256) {
@@ -137,15 +137,15 @@ contract StandardDividendToken is DividendToken, StandardToken {
    * before balance is adjusted.
    */
   function _updateOwed(address _for) internal {
-    uint owedTo = totals_.length.sub(1);
+    uint latestDividend = totals_.length.sub(1);
     // if record of owed payments is not up-to-date
-    if (owed_[_for].to != owedTo) {
-      uint extra = totals_[owedTo]
+    if (owed_[_for].to != latestDividend) {
+      uint extra = totals_[latestDividend]
         .sub(totals_[owed_[_for].to])
         .mul(balanceOf(_for))
         .div(baseTotal_);
       owed_[_for].amount = owed_[_for].amount.add(extra);
-      owed_[_for].to = owedTo;
+      owed_[_for].to = latestDividend;
     }
   }
 }
