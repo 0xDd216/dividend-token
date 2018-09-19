@@ -2,6 +2,7 @@ pragma solidity ^0.4.24;
 
 import "../contracts/StandardDividendToken.sol";
 
+
 contract TestDividendToken is StandardDividendToken {
   
   constructor(address _holder, uint256 _initialAmount, uint256 _minimum) public {
