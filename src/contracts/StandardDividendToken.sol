@@ -2,7 +2,7 @@ pragma solidity ^0.4.24;
 
 import "./DividendToken.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
 
 /**
@@ -15,7 +15,7 @@ import "openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
  * Calculations of owed amounts are amortized, so there exist no unbounded 
  * functions in terms of work done.
  */
-contract StandardDividendToken is DividendToken, StandardToken {
+contract StandardDividendToken is DividendToken, ERC20 {
   using SafeMath for uint256;
 
   struct Owed {
@@ -93,23 +93,23 @@ contract StandardDividendToken is DividendToken, StandardToken {
    * totals to facilitate withdrawal calculation. totals_
    * holds the cumulative totals of payments, adjusted for
    * change in total supply against a base rate. If baseTotal_
-   * is not set then it is set to equal totalSupply_.
+   * is not set then it is set to equal totalSupply().
    */
   function _addDividend(uint256 _amount) internal {
     // avoid divide-by-zero
-    require(totalSupply_ > 0, "There must be tokens to distribute to");
+    require(totalSupply() > 0, "There must be tokens to distribute to");
     
     // if we are yet to set a base total then do so
     if (totals_.length == 1 && baseTotal_ == 0)
-      baseTotal_ = totalSupply_;
+      baseTotal_ = totalSupply();
     
-    if (totalSupply_ == baseTotal_)
+    if (totalSupply() == baseTotal_)
       totals_.push(totals_[totals_.length.sub(1)].add(_amount));
     else {
       // to avoid re-calculation of percentage holdings when
       // supply changes, we factor the changes into the
       // cumulative total of paid dividends
-      uint amount = _amount.mul(baseTotal_).div(totalSupply_);
+      uint amount = _amount.mul(baseTotal_).div(totalSupply());
       totals_.push(totals_[totals_.length.sub(1)].add(amount));
     }
   }  

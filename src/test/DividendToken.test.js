@@ -1,7 +1,7 @@
 const TestDividendToken = artifacts.require("./TestDividendToken.sol");
 const TestPoolingToken = artifacts.require("./TestPoolingToken.sol");
 const BigNumber = web3.BigNumber;
-const { assertRevert } = require("openzeppelin-solidity/test/helpers/assertRevert.js");
+const shouldFail = require("openzeppelin-solidity/test/helpers/shouldFail.js");
 
 require('chai')
   .use(require('chai-bignumber')(BigNumber))
@@ -23,12 +23,12 @@ contract('StandardDividendToken', function(accounts) {
 
   describe("restrictions", function() {
     it("should revert on payment below minimum", function() {
-      return assertRevert(this.token.issueDividend({from: issuer, value: 41}));
+      return shouldFail.reverting(this.token.issueDividend({from: issuer, value: 41}));
     });
 
     it("should revert on payment to zero balance contract", function () {
       return TestDividendToken.new(holder, 0, 0)
-        .then(t => assertRevert(t.issueDividend({from: issuer, value: 42})));
+        .then(t => shouldFail.reverting(t.issueDividend({from: issuer, value: 42})));
     });
   });
 
