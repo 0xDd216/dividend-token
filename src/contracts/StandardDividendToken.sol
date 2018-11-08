@@ -28,6 +28,7 @@ contract StandardDividendToken is DividendToken, ERC20 {
   uint256 internal baseTotal_; // Used to account for changes in supply
   uint256 internal minimum_; // Minimum dividend amount allowed (default 0)
 
+  
   /**
    * @dev Constructor adds an initial 0 to the cumulative totals array
    * to simplify calculations
