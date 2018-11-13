@@ -10,13 +10,13 @@ contract MultiTokenDividendToken is TokenDividendToken, ERC20 {
   using SafeMath for uint256;
 
   struct Owed {
-    uint256 to;
     uint256 amount;
+    uint256 paidFrom;
   }
 
   struct TokenRecord {
     mapping (address => Owed) owed;
-    uint256[] totals;
+    uint256 total;
     uint256 baseTotal;
     uint256 minimum;
     uint256 paidOut;
@@ -33,7 +33,7 @@ contract MultiTokenDividendToken is TokenDividendToken, ERC20 {
     emit TokenDividendIssued(_token, unissued);
     return true;
   }
-
+  
   function transferFrom(address _from, address _to, uint256 _value)
     public returns (bool) {
     IERC20 token;
@@ -56,51 +56,52 @@ contract MultiTokenDividendToken is TokenDividendToken, ERC20 {
     }
     return super.transfer(_to, _value);
   }
-
+  
   function outstandingTokensFor(IERC20 _token, address _recipient)
     public view returns (uint256) {
     TokenRecord storage record = tokens_[address(_token)];
-    if (record.totals.length <= 1) return 0;
+    if (record.total == 0) return 0;
     
-    uint extra = record.totals[record.totals.length.sub(1)]
-      .sub(record.totals[record.owed[_recipient].to])
+    uint extra = record.total
+      .sub(record.owed[_recipient].paidFrom)
       .mul(balanceOf(_recipient))
       .div(record.baseTotal);
     return record.owed[_recipient].amount.add(extra);
     
   }
 
-  function _unissuedTokens(IERC20 _token) internal view returns (uint256) {
+  function _unissuedTokens(IERC20 _token) private view returns (uint256) {
     TokenRecord storage record = tokens_[address(_token)];
     uint balance = _token.balanceOf(address(this));
     
-    if (record.totals.length == 0) return balance;
+    if (record.total == 0) return balance;
     
     return balance
       .add(record.paidOut)
-      .sub(record.totals[record.totals.length.sub(1)]);
+      .sub(record.total);
   }
 
-  function _addTokenDividend(IERC20 _token, uint256 _amount) internal {
+  /**
+   * Assumes _amount is available to distribute
+   */
+  function _addTokenDividend(IERC20 _token, uint256 _amount) private {
     require(totalSupply() > 0, "There must be tokens to distribute to");
 
     TokenRecord storage record = tokens_[address(_token)];
   
-    if (record.totals.length == 0) {     
+    if (record.total == 0) {     
       issuedFor_.push(address(_token)); // update record of which tokens have been paid out in
-      record.totals.push(0);
       if (record.baseTotal == 0) record.baseTotal = totalSupply();
     }
     
     if (totalSupply() == record.baseTotal) {
-      record.totals.push(record.totals[record.totals.length.sub(1)]
-                         .add(_amount));
+      record.total = record.total.add(_amount);
     }
     else {
       uint amount = _amount.mul(record.baseTotal).div(totalSupply());
-      record.totals.push(record.totals[record.totals.length.sub(1)]
-                         .add(amount));
-    }    
+      record.total = record.total.add(amount);
+    }
+    record.paidOut = record.paidOut.add(_amount);
   }
 
   function _withdrawTokenFor(IERC20 _token, address _address) internal returns (uint256) {
@@ -108,21 +109,20 @@ contract MultiTokenDividendToken is TokenDividendToken, ERC20 {
     _updateTokensOwed(_token, _address);
     uint amount = record.owed[_address].amount;
     if (amount > 0) {
-      
-    }
+      _token.transfer(_address, amount);
+    }   
     return amount;
   }
 
   function _updateTokensOwed(IERC20 _token, address _for) internal {
     TokenRecord storage record = tokens_[address(_token)];
-    uint latestDividend = record.totals.length.sub(1);
-    if (record.owed[_for].to != latestDividend) {
-      uint extra = record.totals[latestDividend]
-        .sub(record.totals[record.owed[_for].to])
+    if (record.owed[_for].paidFrom < record.total) {
+      uint extra = record.total
+        .sub(record.owed[_for].paidFrom)
         .mul(balanceOf(_for))
         .div(record.baseTotal);
       record.owed[_for].amount = record.owed[_for].amount.add(extra);
-      record.owed[_for].to = latestDividend;
+      record.owed[_for].paidFrom = record.total;
     } 
   }
 }
