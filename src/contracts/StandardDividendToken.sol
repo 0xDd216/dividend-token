@@ -18,24 +18,15 @@ import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 contract StandardDividendToken is DividendToken, ERC20 {
   using SafeMath for uint256;
 
-  struct Owed {
-    uint256 to; // which payment the amount has been calculated to
+  struct Owed {    
     uint256 amount; // amount owed
+    uint256 paidFrom; // total dividend paid out from
   }
   
   mapping (address => Owed) internal owed_; // Outstanding balance by address
-  uint256[] internal totals_; // Cumulative totals of dividends issued
-  uint256 internal baseTotal_; // Used to account for changes in supply
+  uint256 private total_; // total (adjusted) dividends issued
+  uint256 private baseTotal_; // Used to account for changes in supply
   uint256 internal minimum_; // Minimum dividend amount allowed (default 0)
-
-  
-  /**
-   * @dev Constructor adds an initial 0 to the cumulative totals array
-   * to simplify calculations
-   */
-  constructor() public {
-    totals_.push(0);
-  }
 
   /**
    * @dev Pays a dividend into the contract. Value must be above minimum_.
@@ -73,9 +64,9 @@ contract StandardDividendToken is DividendToken, ERC20 {
    * @return wei owed
    */
   function outstandingFor(address _recipient) public view returns (uint256) {
-    if (totals_.length == 1) return 0;
-    uint extra = totals_[totals_.length.sub(1)]
-      .sub(totals_[owed_[_recipient].to])
+    if (total_ == 0) return 0;
+    uint extra = total_
+      .sub(owed_[_recipient].paidFrom)
       .mul(balanceOf(_recipient))
       .div(baseTotal_);
     return owed_[_recipient].amount.add(extra);
@@ -86,13 +77,15 @@ contract StandardDividendToken is DividendToken, ERC20 {
    * @return wei paid
    */
   function withdraw() public returns (uint256) {
-    return _withdrawFor(msg.sender);
+    uint amount = _withdrawFor(msg.sender);
+    emit Withdrawn(msg.sender, amount);
+    return amount;
   }
 
   /**
    * @dev Adds an incoming dividend payment to cumulative
-   * totals to facilitate withdrawal calculation. totals_
-   * holds the cumulative totals of payments, adjusted for
+   * total_ to facilitate withdrawal calculation. total_
+   * holds the cumulative total of payments, adjusted for
    * change in total supply against a base rate. If baseTotal_
    * is not set then it is set to equal totalSupply().
    */
@@ -101,17 +94,17 @@ contract StandardDividendToken is DividendToken, ERC20 {
     require(totalSupply() > 0, "There must be tokens to distribute to");
     
     // if we are yet to set a base total then do so
-    if (totals_.length == 1 && baseTotal_ == 0)
+    if (total_ == 0 && baseTotal_ == 0)
       baseTotal_ = totalSupply();
     
     if (totalSupply() == baseTotal_)
-      totals_.push(totals_[totals_.length.sub(1)].add(_amount));
+      total_ = total_.add(_amount);
     else {
       // to avoid re-calculation of percentage holdings when
       // supply changes, we factor the changes into the
       // cumulative total of paid dividends
       uint amount = _amount.mul(baseTotal_).div(totalSupply());
-      totals_.push(totals_[totals_.length.sub(1)].add(amount));
+      total_ = total_.add(amount);
     }
   }  
 
@@ -138,15 +131,13 @@ contract StandardDividendToken is DividendToken, ERC20 {
    * before balance is adjusted.
    */
   function _updateOwed(address _for) internal {
-    uint latestDividend = totals_.length.sub(1);
-    // if record of owed payments is not up-to-date
-    if (owed_[_for].to != latestDividend) {
-      uint extra = totals_[latestDividend]
-        .sub(totals_[owed_[_for].to])
+    if (owed_[_for].paidFrom < total_) {
+      uint extra = total_
+        .sub(owed_[_for].paidFrom)
         .mul(balanceOf(_for))
         .div(baseTotal_);
       owed_[_for].amount = owed_[_for].amount.add(extra);
-      owed_[_for].to = latestDividend;
+      owed_[_for].paidFrom = total_;
     }
   }
 }
