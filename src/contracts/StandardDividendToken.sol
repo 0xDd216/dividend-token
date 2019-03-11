@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity ^0.5.0;
 
 import "./DividendToken.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
@@ -114,7 +114,7 @@ contract StandardDividendToken is DividendToken, ERC20 {
    * @param _address to withdraw on behalf of
    * @return the amount withdrawn
    */
-  function _withdrawFor(address _address) internal returns (uint256) {
+  function _withdrawFor(address payable _address) internal returns (uint256) {
     _updateOwed(_address);
     uint amount = owed_[_address].amount;
     if (amount > 0) {
