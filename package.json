@@ -12,10 +12,10 @@
   "author": "0xDd216 <0xDd216@protonmail.com>",
   "license": "MIT",
   "dependencies": {
-    "bignumber.js": "^8.1.1",
+    "bignumber.js": "^9.0.0",
     "chai": "^4.2.0",
     "chai-bignumber": "^3.0.0",
-    "openzeppelin-solidity": "^2.1.3",
-    "openzeppelin-test-helpers": "^0.1.2"
+    "openzeppelin-solidity": "^2.3.0",
+    "openzeppelin-test-helpers": "^0.1.5"
   }
 }
